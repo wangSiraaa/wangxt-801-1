@@ -19,15 +19,19 @@
         <header class="app-header">
             <h1>🌱 社区菜园认领图</h1>
             <div class="header-actions">
+                <button id="btn-filter-toggle" class="btn btn-secondary btn-filter-toggle">🔍 筛选</button>
                 <button id="btn-export" class="btn btn-primary">导出卡片</button>
                 <button id="btn-health" class="btn btn-secondary">健康检查</button>
             </div>
         </header>
 
         <div class="main-content">
-            <aside class="sidebar">
+            <aside class="sidebar" id="sidebar-drawer">
+                <div class="drawer-header">
+                    <h3>🔍 筛选条件</h3>
+                    <span class="drawer-close" id="drawer-close">&times;</span>
+                </div>
                 <div class="panel">
-                    <h3>🔍 筛选</h3>
                     <div class="filter-group">
                         <label>菜畦状态</label>
                         <select id="filter-status">
@@ -43,12 +47,24 @@
                         </select>
                     </div>
                     <div class="filter-group">
+                        <label>浇水提醒</label>
+                        <select id="filter-water">
+                            <option value="all">全部</option>
+                            <option value="needs">需浇水</option>
+                            <option value="ok">无需浇水</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
                         <label>认领人</label>
                         <select id="filter-owner">
                             <option value="all">全部</option>
                         </select>
                     </div>
-                    <button id="btn-reset-filter" class="btn btn-outline btn-block">重置筛选</button>
+                    <div class="filter-actions">
+                        <button id="btn-reset-filter" class="btn btn-outline">重置</button>
+                        <button id="btn-restore-filter" class="btn btn-outline">恢复最近</button>
+                        <button id="btn-apply-filter" class="btn btn-primary">应用筛选</button>
+                    </div>
                 </div>
 
                 <div class="panel">
@@ -66,6 +82,8 @@
                     </div>
                 </div>
             </aside>
+
+            <div class="drawer-overlay" id="drawer-overlay"></div>
 
             <main class="content">
                 <div class="stats-bar">
@@ -87,6 +105,12 @@
                     </div>
                 </div>
 
+                <div class="filter-active-bar" id="filter-active-bar" style="display: none;">
+                    <span class="filter-active-label">已筛选：</span>
+                    <span id="filter-active-tags" class="filter-active-tags"></span>
+                    <button id="btn-clear-active-filter" class="btn-clear-filter">清除</button>
+                </div>
+
                 <div class="garden-map-container">
                     <div id="garden-map" class="garden-map">
                     </div>
@@ -104,6 +128,10 @@
                     <div class="legend-item">
                         <span class="legend-color status-needs-water"></span>
                         <span>需浇水</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color status-highlighted"></span>
+                        <span>筛选匹配</span>
                     </div>
                 </div>
             </main>

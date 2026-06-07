@@ -6,8 +6,16 @@
             this.currentFilters = {
                 status: 'all',
                 crop: 'all',
+                water: 'all',
                 owner: 'all'
             };
+            this.tempFilters = {
+                status: 'all',
+                crop: 'all',
+                water: 'all',
+                owner: 'all'
+            };
+            this.isFilterActive = false;
             this.selectedPlotId = null;
             this.initialized = false;
         }
@@ -24,6 +32,7 @@
                     throw new Error('DOM 元素检查失败');
                 }
 
+                this.loadSavedFilters();
                 this.bindEvents();
                 this.renderGardenMap();
                 this.renderStats();
@@ -31,6 +40,7 @@
                 this.renderReminders();
                 this.renderInspections();
                 this.startReminderCheck();
+                this.updateFilterActiveBar();
                 
                 this.initialized = true;
                 console.log('[GardenApp] 初始化完成');
@@ -68,7 +78,11 @@
         checkDOM() {
             const requiredElements = [
                 'garden-map', 'stat-total', 'stat-claimed', 'stat-available', 'stat-needs-water',
-                'filter-status', 'filter-crop', 'filter-owner', 'btn-reset-filter',
+                'filter-status', 'filter-crop', 'filter-water', 'filter-owner',
+                'btn-reset-filter', 'btn-restore-filter', 'btn-apply-filter',
+                'btn-filter-toggle', 'btn-clear-active-filter',
+                'sidebar-drawer', 'drawer-overlay', 'drawer-close',
+                'filter-active-bar', 'filter-active-tags',
                 'reminder-list', 'inspection-list', 'btn-add-inspection',
                 'btn-export', 'btn-health', 'toast',
                 'claim-modal', 'inspection-modal', 'health-modal'
@@ -85,24 +99,66 @@
             return true;
         }
 
+        loadSavedFilters() {
+            const savedFilters = gardenData.loadFilters();
+            if (savedFilters) {
+                this.currentFilters = { ...savedFilters };
+                this.tempFilters = { ...savedFilters };
+                this.isFilterActive = this.hasActiveFilters();
+                console.log('[GardenApp] 已加载保存的筛选条件:', savedFilters);
+            }
+        }
+
+        hasActiveFilters() {
+            return this.currentFilters.status !== 'all' ||
+                   this.currentFilters.crop !== 'all' ||
+                   this.currentFilters.water !== 'all' ||
+                   this.currentFilters.owner !== 'all';
+        }
+
         bindEvents() {
+            document.getElementById('btn-filter-toggle').addEventListener('click', () => {
+                this.openFilterDrawer();
+            });
+
+            document.getElementById('drawer-close').addEventListener('click', () => {
+                this.closeFilterDrawer();
+            });
+
+            document.getElementById('drawer-overlay').addEventListener('click', () => {
+                this.closeFilterDrawer();
+            });
+
             document.getElementById('filter-status').addEventListener('change', (e) => {
-                this.currentFilters.status = e.target.value;
-                this.renderGardenMap();
+                this.tempFilters.status = e.target.value;
             });
 
             document.getElementById('filter-crop').addEventListener('change', (e) => {
-                this.currentFilters.crop = e.target.value;
-                this.renderGardenMap();
+                this.tempFilters.crop = e.target.value;
+            });
+
+            document.getElementById('filter-water').addEventListener('change', (e) => {
+                this.tempFilters.water = e.target.value;
             });
 
             document.getElementById('filter-owner').addEventListener('change', (e) => {
-                this.currentFilters.owner = e.target.value;
-                this.renderGardenMap();
+                this.tempFilters.owner = e.target.value;
+            });
+
+            document.getElementById('btn-apply-filter').addEventListener('click', () => {
+                this.applyFilters();
             });
 
             document.getElementById('btn-reset-filter').addEventListener('click', () => {
-                this.resetFilters();
+                this.resetTempFilters();
+            });
+
+            document.getElementById('btn-restore-filter').addEventListener('click', () => {
+                this.restoreLastFilters();
+            });
+
+            document.getElementById('btn-clear-active-filter').addEventListener('click', () => {
+                this.clearAllFilters();
             });
 
             document.getElementById('modal-close').addEventListener('click', () => {
@@ -160,24 +216,146 @@
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape') {
                     document.querySelectorAll('.modal.show').forEach(m => m.classList.remove('show'));
+                    this.closeFilterDrawer();
                 }
             });
+
+            window.addEventListener('resize', () => {
+                if (window.innerWidth > 768) {
+                    this.closeFilterDrawer();
+                }
+            });
+        }
+
+        openFilterDrawer() {
+            this.tempFilters = { ...this.currentFilters };
+            this.updateFilterSelects(this.tempFilters);
+            document.getElementById('sidebar-drawer').classList.add('open');
+            document.getElementById('drawer-overlay').classList.add('show');
+            document.body.style.overflow = 'hidden';
+        }
+
+        closeFilterDrawer() {
+            document.getElementById('sidebar-drawer').classList.remove('open');
+            document.getElementById('drawer-overlay').classList.remove('show');
+            document.body.style.overflow = '';
+        }
+
+        updateFilterSelects(filters) {
+            document.getElementById('filter-status').value = filters.status;
+            document.getElementById('filter-crop').value = filters.crop;
+            document.getElementById('filter-water').value = filters.water;
+            document.getElementById('filter-owner').value = filters.owner;
+        }
+
+        applyFilters() {
+            this.currentFilters = { ...this.tempFilters };
+            this.isFilterActive = this.hasActiveFilters();
+            
+            if (this.isFilterActive) {
+                gardenData.saveFilters(this.currentFilters);
+            } else {
+                gardenData.clearFiltersStorage();
+            }
+            
+            this.renderGardenMap();
+            this.renderReminders();
+            this.updateFilterActiveBar();
+            this.closeFilterDrawer();
+            
+            const count = gardenData.getPlots(this.currentFilters).length;
+            this.showToast(`筛选完成，找到 ${count} 个菜畦`, 'success');
+        }
+
+        resetTempFilters() {
+            this.tempFilters = {
+                status: 'all',
+                crop: 'all',
+                water: 'all',
+                owner: 'all'
+            };
+            this.updateFilterSelects(this.tempFilters);
+            this.showToast('筛选条件已重置', 'success');
+        }
+
+        restoreLastFilters() {
+            const lastFilters = gardenData.loadLastFilters();
+            if (lastFilters) {
+                this.tempFilters = { ...lastFilters };
+                this.updateFilterSelects(this.tempFilters);
+                this.showToast('已恢复最近筛选条件', 'success');
+            } else {
+                this.showToast('没有保存的筛选条件', 'warning');
+            }
+        }
+
+        clearAllFilters() {
+            this.currentFilters = {
+                status: 'all',
+                crop: 'all',
+                water: 'all',
+                owner: 'all'
+            };
+            this.tempFilters = { ...this.currentFilters };
+            this.isFilterActive = false;
+            gardenData.clearFiltersStorage();
+            this.updateFilterSelects(this.currentFilters);
+            this.renderGardenMap();
+            this.renderReminders();
+            this.updateFilterActiveBar();
+            this.showToast('筛选条件已清除', 'success');
+        }
+
+        updateFilterActiveBar() {
+            const bar = document.getElementById('filter-active-bar');
+            const tagsContainer = document.getElementById('filter-active-tags');
+            
+            if (!this.isFilterActive) {
+                bar.style.display = 'none';
+                return;
+            }
+            
+            bar.style.display = 'flex';
+            const tags = [];
+            
+            if (this.currentFilters.status !== 'all') {
+                const label = this.currentFilters.status === 'available' ? '空闲' : '已认领';
+                tags.push(`<span class="filter-tag">状态: ${label}</span>`);
+            }
+            
+            if (this.currentFilters.crop !== 'all') {
+                const cropInfo = CROP_TYPES[this.currentFilters.crop];
+                const label = cropInfo ? `${cropInfo.emoji} ${cropInfo.name}` : this.currentFilters.crop;
+                tags.push(`<span class="filter-tag">作物: ${label}</span>`);
+            }
+            
+            if (this.currentFilters.water !== 'all') {
+                const label = this.currentFilters.water === 'needs' ? '需浇水' : '无需浇水';
+                tags.push(`<span class="filter-tag">浇水: ${label}</span>`);
+            }
+            
+            if (this.currentFilters.owner !== 'all') {
+                tags.push(`<span class="filter-tag">认领人: ${this.currentFilters.owner}</span>`);
+            }
+            
+            tagsContainer.innerHTML = tags.join('');
         }
 
         renderGardenMap() {
             try {
                 const mapContainer = document.getElementById('garden-map');
-                const plots = gardenData.getPlots(this.currentFilters);
+                const allPlots = gardenData.plots;
+                const filteredPlotIds = gardenData.getPlots(this.currentFilters).map(p => p.id);
                 const needsWaterIds = gardenData.getNeedsWaterPlots().map(p => p.id);
                 
                 mapContainer.innerHTML = '';
                 
-                if (plots.length === 0) {
-                    mapContainer.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #999;">暂无符合条件的菜畦</div>';
+                if (allPlots.length === 0) {
+                    mapContainer.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #999;">暂无菜畦数据</div>';
                     return;
                 }
                 
-                plots.forEach(plot => {
+                allPlots.forEach(plot => {
                     const cell = document.createElement('div');
                     cell.className = 'plot-cell';
                     
@@ -186,6 +364,14 @@
                         cellStatus = 'needs-water';
                     }
                     cell.classList.add(`status-${cellStatus}`);
+                    
+                    if (this.isFilterActive) {
+                        if (filteredPlotIds.includes(plot.id)) {
+                            cell.classList.add('status-highlighted');
+                        } else {
+                            cell.classList.add('dimmed');
+                        }
+                    }
                     
                     cell.dataset.plotId = plot.id;
                     
@@ -261,6 +447,9 @@
                 this.renderStats();
                 this.renderFilters();
                 this.renderReminders();
+                if (this.isFilterActive) {
+                    this.updateFilterActiveBar();
+                }
             } else {
                 errorEl.textContent = result.message;
                 errorEl.style.display = 'block';
@@ -328,8 +517,8 @@
                 const cropSelect = document.getElementById('filter-crop');
                 const ownerSelect = document.getElementById('filter-owner');
                 
-                const currentCrop = this.currentFilters.crop;
-                const currentOwner = this.currentFilters.owner;
+                const currentCrop = this.tempFilters.crop;
+                const currentOwner = this.tempFilters.owner;
                 
                 const crops = gardenData.getUniqueCrops();
                 cropSelect.innerHTML = '<option value="all">全部</option>';
@@ -356,23 +545,15 @@
             }
         }
 
-        resetFilters() {
-            this.currentFilters = {
-                status: 'all',
-                crop: 'all',
-                owner: 'all'
-            };
-            document.getElementById('filter-status').value = 'all';
-            document.getElementById('filter-crop').value = 'all';
-            document.getElementById('filter-owner').value = 'all';
-            this.renderGardenMap();
-            this.showToast('筛选条件已重置', 'success');
-        }
-
         renderReminders() {
             try {
                 const listContainer = document.getElementById('reminder-list');
-                const needsWaterPlots = gardenData.getNeedsWaterPlots();
+                let needsWaterPlots = gardenData.getNeedsWaterPlots();
+                
+                if (this.isFilterActive) {
+                    const filteredIds = gardenData.getPlots(this.currentFilters).map(p => p.id);
+                    needsWaterPlots = needsWaterPlots.filter(p => filteredIds.includes(p.id));
+                }
                 
                 if (needsWaterPlots.length === 0) {
                     listContainer.innerHTML = '<div style="text-align: center; color: #999; padding: 16px;">暂无浇水提醒</div>';
@@ -488,10 +669,10 @@
 
         exportCards() {
             try {
-                const cardData = gardenData.exportCardData();
+                const cardData = gardenData.exportCardData(this.currentFilters);
                 
                 if (cardData.length === 0) {
-                    this.showToast('暂无已认领菜畦可导出', 'warning');
+                    this.showToast('暂无符合条件的已认领菜畦可导出', 'warning');
                     return;
                 }
                 
@@ -513,6 +694,12 @@
                                 text-align: center;
                                 color: #2d5a27;
                                 margin-bottom: 30px;
+                            }
+                            .filter-info {
+                                text-align: center;
+                                color: #666;
+                                margin-bottom: 20px;
+                                font-size: 14px;
                             }
                             .cards-container {
                                 display: grid;
@@ -582,6 +769,7 @@
                     </head>
                     <body>
                         <h1>🌱 社区菜园认领卡片</h1>
+                        ${this.isFilterActive ? '<div class="filter-info">（按筛选条件导出）</div>' : ''}
                         <div class="cards-container">
                             ${cardData.map(data => `
                                 <div class="card">
@@ -615,7 +803,7 @@
                     </html>
                 `);
                 printWindow.document.close();
-                this.showToast('卡片导出成功', 'success');
+                this.showToast(`已导出 ${cardData.length} 张卡片`, 'success');
             } catch (e) {
                 console.error('导出卡片失败:', e);
                 this.showToast('导出卡片失败: ' + e.message, 'error');

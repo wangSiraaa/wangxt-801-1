@@ -12,7 +12,9 @@ const CROP_TYPES = {
 const STORAGE_KEYS = {
     PLOTS: 'community_garden_plots',
     INSPECTIONS: 'community_garden_inspections',
-    INITIALIZED: 'community_garden_initialized'
+    INITIALIZED: 'community_garden_initialized',
+    FILTERS: 'community_garden_filters',
+    LAST_FILTERS: 'community_garden_last_filters'
 };
 
 class GardenData {
@@ -53,6 +55,51 @@ class GardenData {
             return true;
         } catch (e) {
             console.error('保存数据失败:', e);
+            return false;
+        }
+    }
+
+    saveFilters(filters) {
+        try {
+            localStorage.setItem(STORAGE_KEYS.FILTERS, JSON.stringify(filters));
+            localStorage.setItem(STORAGE_KEYS.LAST_FILTERS, JSON.stringify(filters));
+            return true;
+        } catch (e) {
+            console.error('保存筛选条件失败:', e);
+            return false;
+        }
+    }
+
+    loadFilters() {
+        try {
+            const data = localStorage.getItem(STORAGE_KEYS.FILTERS);
+            if (data) {
+                return JSON.parse(data);
+            }
+        } catch (e) {
+            console.error('加载筛选条件失败:', e);
+        }
+        return null;
+    }
+
+    loadLastFilters() {
+        try {
+            const data = localStorage.getItem(STORAGE_KEYS.LAST_FILTERS);
+            if (data) {
+                return JSON.parse(data);
+            }
+        } catch (e) {
+            console.error('加载最近筛选条件失败:', e);
+        }
+        return null;
+    }
+
+    clearFiltersStorage() {
+        try {
+            localStorage.removeItem(STORAGE_KEYS.FILTERS);
+            return true;
+        } catch (e) {
+            console.error('清除筛选条件失败:', e);
             return false;
         }
     }
@@ -105,6 +152,15 @@ class GardenData {
         
         if (filters.owner && filters.owner !== 'all') {
             result = result.filter(p => p.owner === filters.owner);
+        }
+        
+        if (filters.water && filters.water !== 'all') {
+            const needsWaterIds = this.getNeedsWaterPlots().map(p => p.id);
+            if (filters.water === 'needs') {
+                result = result.filter(p => needsWaterIds.includes(p.id));
+            } else if (filters.water === 'ok') {
+                result = result.filter(p => !needsWaterIds.includes(p.id));
+            }
         }
         
         return result;
@@ -227,6 +283,8 @@ class GardenData {
         localStorage.removeItem(STORAGE_KEYS.PLOTS);
         localStorage.removeItem(STORAGE_KEYS.INSPECTIONS);
         localStorage.removeItem(STORAGE_KEYS.INITIALIZED);
+        localStorage.removeItem(STORAGE_KEYS.FILTERS);
+        localStorage.removeItem(STORAGE_KEYS.LAST_FILTERS);
         this.initializePlots();
         this.inspections = [];
         return { success: true, message: '数据已重置' };
@@ -263,18 +321,43 @@ class GardenData {
         return results;
     }
 
-    exportCardData() {
-        return this.plots
-            .filter(p => p.status !== 'available')
-            .map(plot => ({
-                id: plot.id,
-                owner: plot.owner,
-                crop: plot.crop,
-                cropName: CROP_TYPES[plot.crop]?.name || plot.crop,
-                cropEmoji: CROP_TYPES[plot.crop]?.emoji || '🌱',
-                claimDate: plot.claimDate,
-                remark: plot.remark || '-'
-            }));
+    exportCardData(filters = {}) {
+        let plots = this.plots.filter(p => p.status !== 'available');
+        
+        if (filters.status && filters.status !== 'all') {
+            if (filters.status === 'available') {
+                plots = plots.filter(p => p.status === 'available');
+            } else if (filters.status === 'claimed') {
+                plots = plots.filter(p => p.status !== 'available');
+            }
+        }
+        
+        if (filters.crop && filters.crop !== 'all') {
+            plots = plots.filter(p => p.crop === filters.crop);
+        }
+        
+        if (filters.owner && filters.owner !== 'all') {
+            plots = plots.filter(p => p.owner === filters.owner);
+        }
+        
+        if (filters.water && filters.water !== 'all') {
+            const needsWaterIds = this.getNeedsWaterPlots().map(p => p.id);
+            if (filters.water === 'needs') {
+                plots = plots.filter(p => needsWaterIds.includes(p.id));
+            } else if (filters.water === 'ok') {
+                plots = plots.filter(p => !needsWaterIds.includes(p.id));
+            }
+        }
+        
+        return plots.map(plot => ({
+            id: plot.id,
+            owner: plot.owner,
+            crop: plot.crop,
+            cropName: CROP_TYPES[plot.crop]?.name || plot.crop,
+            cropEmoji: CROP_TYPES[plot.crop]?.emoji || '🌱',
+            claimDate: plot.claimDate,
+            remark: plot.remark || '-'
+        }));
     }
 }
 
