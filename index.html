@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>社区菜园认领图</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="loading-screen" class="loading-screen">
+        <div class="loading-content">
+            <div class="loading-spinner">🌱</div>
+            <div class="loading-text">正在加载社区菜园...</div>
+        </div>
+    </div>
+
+    <div id="app" class="app-container" style="display: none;">
+        <header class="app-header">
+            <h1>🌱 社区菜园认领图</h1>
+            <div class="header-actions">
+                <button id="btn-export" class="btn btn-primary">导出卡片</button>
+                <button id="btn-health" class="btn btn-secondary">健康检查</button>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <aside class="sidebar">
+                <div class="panel">
+                    <h3>🔍 筛选</h3>
+                    <div class="filter-group">
+                        <label>菜畦状态</label>
+                        <select id="filter-status">
+                            <option value="all">全部</option>
+                            <option value="available">空闲</option>
+                            <option value="claimed">已认领</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>作物类型</label>
+                        <select id="filter-crop">
+                            <option value="all">全部</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>认领人</label>
+                        <select id="filter-owner">
+                            <option value="all">全部</option>
+                        </select>
+                    </div>
+                    <button id="btn-reset-filter" class="btn btn-outline btn-block">重置筛选</button>
+                </div>
+
+                <div class="panel">
+                    <h3>🔔 浇水提醒</h3>
+                    <div id="reminder-list" class="reminder-list">
+                        <div class="empty-state">正在加载...</div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h3>📋 巡查记录</h3>
+                    <button id="btn-add-inspection" class="btn btn-outline btn-sm btn-block">+ 新增巡查</button>
+                    <div id="inspection-list" class="inspection-list">
+                        <div class="empty-state">正在加载...</div>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="content">
+                <div class="stats-bar">
+                    <div class="stat-item">
+                        <span class="stat-label">总菜畦</span>
+                        <span id="stat-total" class="stat-value">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">已认领</span>
+                        <span id="stat-claimed" class="stat-value stat-claimed">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">空闲</span>
+                        <span id="stat-available" class="stat-value stat-available">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">需浇水</span>
+                        <span id="stat-needs-water" class="stat-value stat-warning">0</span>
+                    </div>
+                </div>
+
+                <div class="garden-map-container">
+                    <div id="garden-map" class="garden-map">
+                    </div>
+                </div>
+
+                <div class="legend">
+                    <div class="legend-item">
+                        <span class="legend-color status-available"></span>
+                        <span>空闲</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color status-claimed"></span>
+                        <span>已认领</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color status-needs-water"></span>
+                        <span>需浇水</span>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <div id="error-screen" class="error-screen" style="display: none;">
+        <div class="error-content">
+            <div class="error-icon">⚠️</div>
+            <h2>应用加载失败</h2>
+            <p id="error-message">请刷新页面重试</p>
+            <button onclick="location.reload()" class="btn btn-primary">刷新页面</button>
+        </div>
+    </div>
+
+    <div id="claim-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">认领菜畦</h3>
+                <span class="modal-close" id="modal-close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>菜畦编号</label>
+                    <input type="text" id="claim-plot-id" readonly>
+                </div>
+                <div class="form-group">
+                    <label>认领人 <span class="required">*</span></label>
+                    <input type="text" id="claim-owner" placeholder="请输入认领人姓名">
+                </div>
+                <div class="form-group">
+                    <label>作物类型 <span class="required">*</span></label>
+                    <select id="claim-crop">
+                        <option value="">请选择作物</option>
+                        <option value="tomato">🍅 番茄</option>
+                        <option value="cucumber">🥒 黄瓜</option>
+                        <option value="carrot">🥕 胡萝卜</option>
+                        <option value="lettuce">🥬 生菜</option>
+                        <option value="pepper">🌶️ 辣椒</option>
+                        <option value="eggplant">🍆 茄子</option>
+                        <option value="radish">🥔 土豆</option>
+                        <option value="onion">🧅 洋葱</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>备注</label>
+                    <textarea id="claim-remark" rows="3" placeholder="可选：种植计划或备注"></textarea>
+                </div>
+                <div id="claim-error" class="error-message" style="display: none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-cancel-claim" class="btn btn-outline">取消</button>
+                <button id="btn-confirm-claim" class="btn btn-primary">确认认领</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="inspection-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>新增巡查记录</h3>
+                <span class="modal-close" id="inspection-modal-close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>巡查菜畦</label>
+                    <select id="inspection-plot">
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>巡查人 <span class="required">*</span></label>
+                    <input type="text" id="inspection-person" placeholder="请输入巡查人姓名">
+                </div>
+                <div class="form-group">
+                    <label>巡查内容 <span class="required">*</span></label>
+                    <textarea id="inspection-content" rows="4" placeholder="请输入巡查内容..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>问题状态</label>
+                    <select id="inspection-status">
+                        <option value="normal">正常</option>
+                        <option value="warning">需关注</option>
+                        <option value="issue">有问题</option>
+                    </select>
+                </div>
+                <div id="inspection-error" class="error-message" style="display: none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-cancel-inspection" class="btn btn-outline">取消</button>
+                <button id="btn-confirm-inspection" class="btn btn-primary">保存记录</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="health-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🏥 系统健康检查</h3>
+                <span class="modal-close" id="health-modal-close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="health-results">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-close-health" class="btn btn-primary">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        window.addEventListener('error', function(e) {
+            console.error('全局错误:', e.error);
+            showErrorScreen('JavaScript 执行错误: ' + e.message);
+        });
+
+        function showErrorScreen(message) {
+            document.getElementById('loading-screen').style.display = 'none';
+            document.getElementById('app').style.display = 'none';
+            document.getElementById('error-screen').style.display = 'flex';
+            document.getElementById('error-message').textContent = message;
+        }
+
+        function hideLoadingScreen() {
+            document.getElementById('loading-screen').style.display = 'none';
+        }
+
+        function showApp() {
+            hideLoadingScreen();
+            document.getElementById('app').style.display = 'flex';
+        }
+    </script>
+    <script src="js/data.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
